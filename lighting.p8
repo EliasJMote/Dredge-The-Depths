@@ -55,7 +55,7 @@ function cone_lighting(obj,angle_1,angle_2)
 
 	-- for each scanline
 	--for j=0,127 do
-	for j=96,127 do
+	for j=96,127+cam.y do
 
 		-- if we are on a horizontal scanline above or below the object's max light radius, draw the whole
 		-- horizontal line black
@@ -82,7 +82,8 @@ function cone_lighting(obj,angle_1,angle_2)
 			end
 
 			-- draw a horizontal line up to the leftmost part of the light circle
-			rectfill(center.x + obj.light_radius + 1,j,128,j,0)
+			--rectfill(center.x + obj.light_radius + 1,j,128,j,0)
+			rectfill(center.x + obj.light_radius + 1,j,128+cam.x,j,0)
 		end
 	end
 end
