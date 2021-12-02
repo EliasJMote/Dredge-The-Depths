@@ -18,7 +18,7 @@ function emit_bubble(x,y)
 		y=y,
 		r=4,
 		t=flr(rnd(30)),
-		col=3
+		col=6
 	}
 	return b
 end
@@ -38,7 +38,7 @@ function update_bubble(b,bs)
 	if(b.t % 30 == 0) then
 		b.r -= 1
 	end
-	if(b.t >= 120) then
+	if(b.t >= 150) then
 		del(bs,b)
 	end
 	b.t += 1

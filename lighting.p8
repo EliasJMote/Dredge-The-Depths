@@ -55,29 +55,30 @@ function cone_lighting(obj,angle_1,angle_2)
 
 	-- for each scanline
 	--for j=0,127 do
-	for j=96,127+cam.y do
+	--for j=96,127+cam.y do
+	for j=dark_level,127+cam.y do
 
 		-- if we are on a horizontal scanline above or below the object's max light radius, draw the whole
 		-- horizontal line black
 		if(abs(center.y - j) > obj.light_radius) then
-			rectfill(0,j,127,j,0)
+			rectfill(cam.x,j,cam.x+127,j,0)
 		else
 
 			-- draw a horizontal line up to the leftmost part of the light circle
 			if(center.x - obj.light_radius > 0) then
-				rectfill(0,j,center.x - obj.light_radius - 1,j,0)
+				rectfill(cam.x,j,center.x - obj.light_radius - 1,j,0)
 			end
 
 			-- color black pixels outside the light radius of the player
-			for i=center.x - obj.light_radius,center.x + obj.light_radius do
+			for i=center.x - obj.light_radius,center.x + obj.light_radius + 1 do
 				if(distance(i,j,center.x,center.y) > obj.light_radius) then
 					pset(i,j,0)
 				else
-					if(obj.light_type == "point") then
-						if(pget(i,j) == 0) then
-							pset(i,j,1)
-						end
+					--if(obj.light_type == "point") then
+					if(pget(i,j) == 0) then
+						pset(i,j,1)
 					end
+					--end
 				end
 			end
 
@@ -93,7 +94,7 @@ function circle_lighting(obj)
 	cone_lighting(obj,0,360)
 end
 
-function multiple_circle_lighting(objs)
+--[[function multiple_circle_lighting(objs)
 	local light_pixels = {}
 
 	for o in all(objs) do
@@ -119,7 +120,7 @@ function multiple_circle_lighting(objs)
 				end
 			end
 		end
-	end]]
+	end
 
 	-- check the min_y,max_y range for the light
 	if(objs[2] == nil) then
@@ -196,4 +197,4 @@ function multiple_circle_lighting(objs)
 			end
 		end
 	end
-end
+end]]

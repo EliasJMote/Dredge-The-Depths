@@ -2,14 +2,11 @@ pico-8 cartridge // http://www.pico-8.com
 version 32
 __lua__
 -- check if a map cell is solid
---[[function solid(x,y)
-	local obj = blocks[cur_room][flr(x/8)+16*flr(y/8)+1]
-	if(obj ~= nil) then
-
-		-- flag 0 is a solid block
-		if(fget(obj,0)) then
-			return true
-		end
+function solid(x,y)
+	
+	-- subtract 8 to account for the map being low on the shallow level
+	if(fget(mget(flr(x/8),flr(y/8)-map_tile_offset),0)) then
+		return true
 	end
 	return false
 end
@@ -19,45 +16,28 @@ function solid_area(x,y,w,h)
 	return solid(x+w,y) or solid(x+w,y+h) or solid(x,y) or solid(x,y+h)
 end
 
--- check if something has collided with the player
-function char_collision(e)
-	if(p1.x<e.x+e.w and p1.x+p1.w>e.x and p1.y<e.y+e.h and p1.y+p1.h>e.y) then
-		return true
-	end
-	return false
-end
-
 -- player keyboard commands
 function player_controls()
 	local spd = 1
 
-	-- move around
-	if(not is_reading) then
-		-- horizontal movement
-		if(btn(0)) then
-			p1.dx = -spd
-			p1.dir = "left"
-		end
-		if(btn(1)) then
-			p1.dx = spd 
-			p1.dir = "right"
-		end
-		if not btn(0) and not btn(1) then
-			p1.dx = 0
-		end
-		
-		-- vertical movement
-		if(btn(2)) then
-			p1.dy = -spd
-			p1.ydir = "up"
-		end
-		if(btn(3)) then
-			p1.dy = spd
-			p1.ydir = "down"
-		end
-		if not btn(2) and not btn(3) then
-			p1.dy = 0
-		end
+	-- player horizontal movement
+	if(btn(0) and player.x > 0) then
+		player.dx = -spd
+		player.dir = "left"
+	elseif(btn(1)) then
+		player.dx = spd
+		player.dir = "right"
+	else
+		player.dx = 0
+	end
+
+	-- player vertical movement
+	if(btn(2) and player.y > sea_level-4+8) then
+		player.dy = -spd
+	elseif(btn(3)) then
+		player.dy = spd
+	else
+		player.dy = 0
 	end
 end
 
@@ -80,4 +60,4 @@ function move_actor(act, is_solid)
 		act.x += act.dx
 		act.y += act.dy
 	end
-end]]
+end

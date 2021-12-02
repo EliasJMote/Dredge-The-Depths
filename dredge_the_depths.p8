@@ -5,32 +5,82 @@ __lua__
 #include particle_system.p8
 #include physics.p8
 
+--[[
+0X0    GFX
+0X1000 GFX2/MAP2 (SHARED)
+0X2000 MAP
+0X3000 GFX FLAGS
+0X3100 SONG
+0X3200 SFX
+0X4300 USER DATA
+0X5600 CUSTOM FONT (IF ONE IS DEFINED)
+0X5E00 PERSISTENT CART DATA (256 BYTES)
+0X5F00 DRAW STATE
+0X5F40 HARDWARE STATE
+0X5F80 GPIO PINS (128 BYTES)
+0X6000 SCREEN (8K)
+0x8000 USER DATA
+]]
+
+function inventory_toggle()
+	if(state == "game") then
+		state = "inventory"
+		menuitem(1, "return to game", inventory)
+	elseif(state == "inventory") then
+		state = "game"
+		menuitem(1, "go to inventory", inventory)
+	end
+end
+
 function _init()
 
+	-- load the graphics, map, flags, music and sfx for shallow waters
+	reload(0x0,0x0,0x4300,"shallow_waters.p8")
+
 	-- version
-	version = "0.1.2"
+	version = "0.2"
+
+	menuitem(1, "go to inventory", inventory_toggle)
+
+	state = "game"
+
+	biome_name = "shallows"
 
 	-- create player
 	player = {}
 	player.x = 64
 	player.y = 64
-	player.w = 16
-	player.h = 8
+	player.w = 15
+	player.h = 7
 	player.dx = 0
 	player.dy = 0
-	player.light_radius = 14
+	player.init_light_radius = 14
+	player.light_radius = player.init_light_radius
 	player.light_type = "point"
 	player.sonar = nil
+	player.dir = "right"
+	player.can_mine = false
+	player.block_mining = false
+	player.mine_block = 0
+
+	sea_level = 56
+	dark_level = sea_level + 192
+	map_tile_offset = (sea_level + 8) / 8
 
 	-- add clouds
-	clouds = {}
-	add(clouds,{x=58,y=4,r=4,dx=0.1})
-	add(clouds,{x=64,y=4,r=4,dx=0.1})
-	add(clouds,{x=60,y=6,r=4,dx=0.1})
-	add(clouds,{x=68,y=6,r=4,dx=0.1})
+	--clouds = {}
 
-	add(clouds,{x=20,y=6,r=6,dx=0.05})
-	add(clouds,{x=26,y=8,r=6,dx=0.05})
+
+	--[[for i=0,24 do
+		add(clouds,{x=-4+6*i,y=2,r=4,dx=0.8})
+	end
+	for i=0,24 do
+		add(clouds,{x=0+6*i,y=4,r=4,dx=0.8})
+	end]]
+	
+
+	--add(clouds,{x=20,y=6,r=6,dx=0.05})
+	--add(clouds,{x=26,y=8,r=6,dx=0.05})
 
 	-- add waves
 	waves = {}
@@ -38,8 +88,8 @@ function _init()
 		add(waves,i*8)
 	end
 
-	far_buoys = {{x=32,y=11+8,spr=10,w=8,h=8,dy=1}}
-	close_buoys = {{x=104,y=4+8,spr=9,w=8,h=16,dy=2}}
+	far_buoys = {{x=32,y=sea_level-5+8,spr=10,w=8,h=8,dy=1}}
+	close_buoys = {{x=104,y=sea_level-12+8,spr=9,w=8,h=16,dy=2}}
 
 	light_sources = {{x=56,y=126,w=3,h=2,col=10},{x=64,y=126,w=3,h=2,col=10}}
 
@@ -51,15 +101,11 @@ function _init()
 		add(beacons,{x=88+i*8,y=104,spr=33,timer=0,light_radius=4})
 	end
 
-	-- (x=88+4,y=104)
-
 	-- add bubble emitters
 	emitters = {}
-	add(emitters,create_bubble_emitter(16,128))
-	add(emitters,create_bubble_emitter(24,128))
-	add(emitters,create_bubble_emitter(32,128))
-
-
+	add(emitters,create_bubble_emitter(16,128+72))
+	add(emitters,create_bubble_emitter(24,128+72))
+	add(emitters,create_bubble_emitter(32,128+72))
 
 	bubbles = {}
 	sparks = {}
@@ -69,299 +115,331 @@ function _init()
 	-- camera position
 	cam = {x=0,y=0}
 
-	laser_cutter_emitter = {}
-	--add(emitters,create_spark_emitter(64,64))
+	laser_drill_emitter = {}
 	
-
 	-- play ocean sound
 	sfx(0)
 end
-
+ 
 function _update()
-	--[[if(btnp(4)) then
-		if(player.light_type == "point") then
-			player.light_type = "cone"
-		else
-			player.light_type = "point"
-		end
-	end]]
 
-	-- shoot sonar
-	--if(btnp(4)) then
-		--player.sonar = {x=player.x+player.w-6,y=player.y+player.h/2-7}
-	--end
-	if(btn(4) and laser_cutter_emitter == nil) then
-		laser_cutter_emitter = create_spark_emitter(player.x+15,player.y+7)
-	elseif(btn(4) == false and laser_cutter_emitter ~= nil) then
-		laser_cutter_emitter = nil
-	end
+	if(state == "game") then
 
-	player.x += player.dx
-	player.y += player.dy
-
-	-- player horizontal movement
-	if(btn(0) and player.x > 0) then
-		player.dx = -1
-	--elseif(btn(1) and player.x < 128 - player.w) then
-	elseif(btn(1)) then
-		player.dx = 1
-	else
-		player.dx = 0
-	end
-
-	-- player vertical movement
-	if(btn(2) and player.y > 16-4+8) then
-		player.dy = -1
-	--elseif(btn(3) and player.y < 128 - 8) then
-	elseif(btn(3)) then
-		player.dy = 1
-	else
-		player.dy = 0
-	end
-
-	-- move waves
-	for i=1,#waves do
-		waves[i] += 0.25
-		if(waves[i] >= 128) then
-			waves[i] = 0 - 8
-		end
-	end
-
-	-- move clouds
-	for i=1,#clouds do
-		clouds[i].x += clouds[i].dx
-		if(clouds[i].x >= 144) then
-			clouds[i].x = 0
-		end
-	end
-
-	-- update beacons
-	--[[for i=1,#beacons do
-		local b = beacons[i]
-		b.light_radius = 6 + 1.5 * sin(timer/60+0.5*(i-1))
-	end]]
-
-	-- update emitters
-	for e in all(emitters) do
-		--if(e.name == "bubble") then
-			e,bubbles = update_bubble_emitter(e,bubbles)
-		--else
-			--e,sparks = update_spark_emitter(e,sparks)
+		-- shoot sonar
+		--if(btnp(4)) then
+			--player.sonar = {x=player.x+player.w-6,y=player.y+player.h/2-7}
 		--end
-	end
+		if(btn(4) and laser_drill_emitter == nil) then
+			if(player.dir == "left") then
+				laser_drill_emitter = create_spark_emitter(player.x+3,player.y+7)
+			else
+				laser_drill_emitter = create_spark_emitter(player.x+15,player.y+7)
+			end
+		elseif(btn(4) == false and laser_drill_emitter ~= nil) then
+			laser_drill_emitter = nil
+		end
 
-	if(laser_cutter_emitter ~= nil) then
-		laser_cutter_emitter.x = player.x+15
-		laser_cutter_emitter.y = player.y+7
-		laser_cutter_emitter,sparks = update_spark_emitter(laser_cutter_emitter,sparks)
-	end
+		player_controls()
 
-	-- update bubbles
-	for b in all(bubbles) do
-		b,bubbles = update_bubble(b,bubbles)
-	end
+		-- blocks that are one block wide can be moved through in the middle of the body
+		-- when going up or down but not left or right
+		-- this is a bug (seems to be caused by the player being double normal width)
+		move_actor(player, true)
 
-	for s in all(sparks) do
-		s,sparks = update_spark(s,sparks)
-	end
+		-- block finder (for mining)
+		player.can_mine = false
+		player.mine_block = 0
+		if(player.dir == "left") then
+			player.mine_block = mget(flr(player.x/8-1),flr(player.y/8-1)-map_tile_offset+1)
+			
+		-- block finding on the right goes one block too far when player is as horizontally close to a block as
+		-- possible (bug)
+		else
+			player.mine_block = mget(flr(player.x/8+3),flr(player.y/8-1)-map_tile_offset+1)
+		end
 
-	if(player.sonar ~= nil) then
-		player.sonar.x += 6
-	end
+		if(fget(player.mine_block,0)) then
+			player.can_mine = true
+		end
 
-	-- update camera
-	if(player.x >= 64 and player.y >= 64) then
+		if(player.can_mine and btn(4)) then
+			player.block_mining = true
+		else
+			player.block_mining = false
+		end
+
+		-- move waves
+		for i=1,#waves do
+			waves[i] += 0.25
+			if(waves[i] >= 128) then
+				waves[i] = 0 - 8
+			end
+		end
+
+		-- move clouds
+		--[[for i=1,#clouds do
+			clouds[i].x += clouds[i].dx
+			if(clouds[i].x >= 144) then
+				clouds[i].x = -4
+			end
+		end]]
+
+		-- update emitters
+		for e in all(emitters) do
+			--if(e.name == "bubble") then
+				e,bubbles = update_bubble_emitter(e,bubbles)
+			--else
+				--e,sparks = update_spark_emitter(e,sparks)
+			--end
+		end
+
+		if(laser_drill_emitter ~= nil) then
+			
+			if(laser_drill_emitter ~= nil) then
+				if(player.dir == "left") then
+					laser_drill_emitter.x = player.x + 1
+				else
+					laser_drill_emitter.x = player.x + 15
+				end
+			end
+
+			laser_drill_emitter.y = player.y+7
+			laser_drill_emitter,sparks = update_spark_emitter(laser_drill_emitter,sparks)
+		end
+
+		-- update bubbles
+		for b in all(bubbles) do
+			b,bubbles = update_bubble(b,bubbles)
+		end
+
+		for s in all(sparks) do
+			s,sparks = update_spark(s,sparks)
+		end
+
+		if(player.sonar ~= nil) then
+			player.sonar.x += 6
+		end
+
+		-- initialize the camera
 		cam = {x=player.x-64,y=player.y-64}
-	elseif(player.x >= 64 and player.y < 64) then
-		cam = {x=player.x-64,y=0}
-	elseif(player.x < 64 and player.y >= 64) then
-		cam = {x=0,y=player.y-64}
-	else
-		cam = {x=0,y=0}
-	end
 
-	timer += 1
+		if(player.x < 64) then
+			cam.x = 0
+		elseif(player.x >= 128*8-64) then
+			cam.x = 128*8-128
+		end
+
+		if(player.y < 64) then
+			cam.y = 0
+		elseif(player.y >= 32*10-64) then
+			cam.y = 32*10-128
+		end
+
+		player.light_radius = player.init_light_radius + sin(timer/45)
+
+		timer += 1
+	end
 end
 
 function _draw()
 	cls()	
 
-	-- ocean and sky background
-	rectfill(cam.x,0+8,cam.x+127,4-1+8,5)
-	rectfill(cam.x,4+8,cam.x+127,16-1+8,6)
+	if(state == "game") then
 
-	
-	rectfill(cam.x,16+8,cam.x+127,64-1+8,12)
-	rectfill(cam.x,64+8,cam.x+127,96-1,1)
-	--rectfill(cam.x,96+8,cam.x+127,128-1+8,0)
+		camera(cam.x,cam.y)
 
-	-- draw clouds
-	for c in all(clouds) do
-		circfill(c.x,c.y+8,c.r,13)
-	end
+		-- sky background
+		--rectfill(cam.x,8,cam.x+127,24-1+8,5)
+		rectfill(cam.x,8,cam.x+127,sea_level-1+8,5)
 
-	-- draw far buoys
-	for b in all(far_buoys) do
-		spr(b.spr,b.x,b.y+b.dy*sin((timer+30)/90),b.w/8,b.h/8)
-	end
+		-- draw moons
+		spr(13,cam.x+88,cam.y/8+30)
+		spr(14,cam.x+16,cam.y/4+44,2,2)
+		
+		-- ocean background
+		rectfill(cam.x,sea_level+8,cam.x+127,sea_level+64-1+8,12)
+		rectfill(cam.x,sea_level+64+8,cam.x+127,dark_level-1,1)
+		--rectfill(cam.x,sea_level+96,cam.x+127,32*10-1,0)
 
-	-- draw bubble particles
-	for b in all(bubbles) do
-		circ(b.x,b.y,b.r,12)
-	end
+		-- light to dark ocean gradient
+		rectfill(0,sea_level+64-6,cam.x+127,sea_level+64-6,1)
+		rectfill(0,sea_level+64,cam.x+127,sea_level+64,1)
+		rectfill(0,sea_level+64+4,cam.x+127,sea_level+64+4,1)
+		rectfill(0,sea_level+64+6,cam.x+127,sea_level+64+6,1)
 
-	-- draw waves
-	for w in all(waves) do
-		rectfill(w,16+8,w+4,16+8,7)
-	end
+		-- dark to black ocean gradient
+		rectfill(0,dark_level-2,cam.x+127,dark_level-2,0)
+		rectfill(0,dark_level-4,cam.x+127,dark_level-4,0)
+		rectfill(0,dark_level-8,cam.x+127,dark_level-8,0)
+		rectfill(0,dark_level-14,cam.x+127,dark_level-14,0)
 
-	-- draw blocks
-	--spr(1,88,128-8)
-	--spr(1,88+8,128-8)
-	--spr(1,88+16,128-8)
+		-- draw clouds
+		--[[for c in all(clouds) do
+			circfill(c.x+cam.x,c.y+8,c.r,5)
+		end]]
 
-	-- draw columns
-	--[[for i=0,2 do
-		spr(32,16*i,128-16)
-		spr(32,16*i,128-8,1,1,false,true)
-	end]]
+		--skyline
+		rectfill(0,8,cam.x+127,10,6)
+		rectfill(0,12,cam.x+127,12,6)
+		rectfill(0,14,cam.x+127,14,6)
+		rectfill(0,18,cam.x+127,18,6)
+		rectfill(0,24,cam.x+127,24,6)
 
-	-- draw the dolphin
-	spr(6,96,32+3*sin(timer/90)+16,2,1,true)
-
-	-- draw lights
-	--[[for l in all(light_sources) do
-		rectfill(l.x,l.y,l.x+l.w,l.y+l.h,l.col)
-	end]]
-
-	-- draw close buoys
-	for b in all(close_buoys) do
-		spr(b.spr,b.x,b.y+b.dy*sin((timer+30)/90),b.w/8,b.h/8)
-	end
-
-	-- draw map
-	--[[if(player.x >= 64 and player.y >= 64) then
-		camera(player.x - 64, player.y - 64)
-	elseif(player.x >= 64 and player.y < 64) then
-		camera(player.x - 64, 0)
-	elseif(player.x < 64 and player.y >= 64) then
-		camera(0, player.y - 64)
-	else
-		camera(0,0)
-	end]]
-	camera(cam.x,cam.y)
-	--map(0,0,0,16,16,16)
-	map(0,0,0,16+8,128,64)
-
-	-- draw the player
-	palt(0,false)
-	palt(2,true)
-	--spr(2+(flr(timer/6)%2)*2,player.x,player.y,2,1)
-	spr(2+(flr(timer/6)%2)*2,player.x,player.y,2,1)
-	palt(0,true)
-	palt(2,false)
-
-	-- draw the laser cutter on the player
-	if(laser_cutter_emitter) then
-		rectfill(player.x+13,player.y+7-flr(timer/6)%2,player.x+13+1,player.y+7-flr(timer/6)%2,7+timer%3)
-	end
-
-	-- add circle lighting for the player
-	circle_lighting(player)
-
-	--print(#sparks,0,8,7)
-
-	for s in all(sparks) do
-		line(s.x,s.y,s.x,s.y,7+timer%3)
-	end
-
-	-- draw sonar
-	if(player.sonar ~= nil) then
-		spr(8,player.sonar.x,player.sonar.y,1,2)
-	end
-
-	-- draw fog
-	--[[for j=0,3,2 do
-		for i=0,128,2 do
-			rectfill(i,j,i,j,5)
+		-- draw far buoys
+		for b in all(far_buoys) do
+			spr(b.spr,b.x+cam.x*7/8,b.y+b.dy*sin((timer+30)/90),b.w/8,b.h/8)
 		end
-	end
-	for j=4,15,2 do
-		for i=0,128,2 do
-			rectfill(i,j,i,j,6)
+
+		-- draw bubble particles
+		for b in all(bubbles) do
+			circ(b.x,b.y,b.r,b.col)
 		end
-	end]]
 
-	-- draw health
-	--rectfill(0,0,8,8,0)
+		-- draw waves
+		for w in all(waves) do
+			rectfill(cam.x+w,sea_level+8,cam.x+w+4,sea_level+8,7)
+		end
 
-	--[[print("fps = " .. stat(7),0,0,8)
-	print("cpu = " .. stat(1))
-	]]
+		-- draw blocks
+		--spr(1,88,128-8)
+		--spr(1,88+8,128-8)
+		--spr(1,88+16,128-8)
 
-	rectfill(cam.x,cam.y,cam.x+127,cam.y+7,0)
+		-- draw columns
+		--[[for i=0,2 do
+			spr(32,16*i,128-16)
+			spr(32,16*i,128-8,1,1,false,true)
+		end]]
 
-	print("depth = " .. flr((player.y + player.h)/8 - 3) .. " ft",cam.x,cam.y,8)
+		-- draw the dolphin
+		spr(6,96,sea_level+32+3*sin(timer/90)+16,2,1,true)
+
+		-- draw close buoys
+		for b in all(close_buoys) do
+			spr(b.spr,b.x,b.y+b.dy*sin((timer+30)/90),b.w/8,b.h/8)
+		end
+
+		-- draw the normal map
+		map(0,0,0,sea_level+8,128,64)
+
+		-- add circular lighting for the player
+		circle_lighting(player)
+
+		-- draw the light layer (flag 1)
+		map(0,0,0,sea_level+8,128,64,0x2)
+
+		-- draw the player
+		if(player.dir == "right") then
+			spr(2+(flr(timer/6)%2)*2,player.x,player.y,2,1)
+		else
+			spr(2+(flr(timer/6)%2)*2,player.x,player.y,2,1,true)
+		end
+
+		-- draw the laser cutter on the player
+		if(laser_drill_emitter) then
+			if(player.dir == "left") then
+				rectfill(player.x+1,player.y+7-flr(timer/6)%2,player.x+1+1,player.y+7-flr(timer/6)%2,7+timer%3)
+			else
+				rectfill(player.x+13,player.y+7-flr(timer/6)%2,player.x+13+1,player.y+7-flr(timer/6)%2,7+timer%3)
+			end
+			
+		end
+
+		-- draw the sparks
+		for s in all(sparks) do
+			line(s.x,s.y,s.x,s.y,7+timer%3)
+		end
+
+		-- draw sonar
+		if(player.sonar ~= nil) then
+			spr(8,player.sonar.x,player.sonar.y,1,2)
+		end
+
+		-- draw fog
+		--[[for j=0,3,2 do
+			for i=0,128,2 do
+				rectfill(i,j,i,j,5)
+			end
+		end
+		for j=4,15,2 do
+			for i=0,128,2 do
+				rectfill(i,j,i,j,6)
+			end
+		end]]
+
+		--[[print("fps = " .. stat(7),0,0,8)
+		print("cpu = " .. stat(1))
+		]]
+
+		----------------------------------------------------------------
+		-------------------- draw the status screen --------------------
+		----------------------------------------------------------------
+
+
+		-- draw the black bar for the status screen
+		rectfill(cam.x,cam.y,cam.x+127,cam.y+7,0)
+
+		--
+		--print("\151",cam.x+24,cam.y)
+
+		-- draw the 'o' item
+		rect(cam.x,cam.y,cam.x+7,cam.y+7,8)
+		print("\142",cam.x+11,cam.y+3,7)
+		spr(64,cam.x,cam.y)
+
+		-- draw the 'x' item
+		rect(cam.x+24,cam.y,cam.x+24+7,cam.y+7,8)
+		print("\151",cam.x+11+24,cam.y+3,7)
+		spr(65,cam.x+24,cam.y)
+
+		-- draw the depth
+		spr(127,cam.x+48,cam.y)
+		print(flr((player.y + player.h)/8 - 8) .. "\'",cam.x+76-16,cam.y+3,7)
+
+		-- draw biome
+		--rect(cam.x+96,cam.y,cam.x+96+8-1,cam.y+8-1,8)
+		spr(126,cam.x+120,cam.y)
+		--print(player.mine_block,cam.x,cam.y,7)
+		--[[if(player.mine_block == 56 and player.block_mining) then
+			print("currently mining quartz",cam.x,cam.y,7)
+		else
+			print("not currently mining",cam.x,cam.y,7)
+		end]]
+
+		-- draw oxygen
+		spr(125,cam.x+80,cam.y)
+		print("X160",cam.x+90,cam.y+3)
+
+		-- draw health
+		rect(cam.x+109,cam.y,cam.x+117-1,cam.y+8-1,8)
+
+		--print(mget(flr(player.x/8),flr(player.y/8)),cam.x,cam.y,7)
+		--print("(" .. player.x .. "," .. player.y .. ")",cam.x,cam.y,7)
+		--print("(" .. player.x .. "," .. player.y .. ")",cam.x,cam.y+8,8)
+		--print(mget(flr(player.x/8),flr(player.y/8)-3),cam.x,cam.y+8,8)
+		--rectfill(player.x,player.y,player.x,player.y,0)
+		--print("(" .. player.x .. "," .. player.y .. ")",cam.x,cam.y,7)
+
+		-- block finder (for mining)
+		if(player.dir == "left") then
+			if(player.can_mine) then
+				local c = 11
+				if(fget(player.mine_block,2) and player.block_mining) then c = 7+timer%3 end
+				rect(player.x-8-player.x%8,player.y-player.y%8,player.x-player.x%8-1,player.y+7-player.y%8,c)
+			end
+
+		-- block finding on the right goes one block too far when player is as horizontally close to a block as
+		-- possible (bug)
+		else
+			
+			if(player.can_mine) then
+				local c = 11
+				if(fget(player.mine_block,2) and player.block_mining) then c = 7+timer%3 end
+				rect(player.x+player.w-player.x%8+8+1,player.y-player.y%8,player.x+player.w+8+8-player.x%8,player.y+7-player.y%8,c)
+			end
+		end
+
+	elseif(state == "inventory") then
+		spr(64,64,64)
+	end
 end
-__gfx__
-000000004fff44442222222222222222222222222222222200000055d00000000550000000088000000880000000000000000000000000000000000000000000
-0000000044fff44488222226666222222222222666622222000000055d0000005555000000888800008888000000000000000000000000000000000000000000
-00000000ff44fff488899226666228882222222666622888dd0000055ddd550055550000088008800087a8000000000000000000000000000000000000000000
-00000000f4444fff2222299999998666888999999999866600ddddddd555755d0575500080099008008aa8000000000000000000000000000000000000000000
-000000004444ff4f222229999999886688899999999988660055555555555555055750008097a908000880000000000000000000000000000000000000000000
-00000000f444f444888992222922288888222222299228885500055ddd55d00005577500809aa908000880000000000000000000000000000000000000000000
-00000000ff444f44882222222292222222222222222996620000000000dd00000557750080099008000880000000000000000000000000000000000000000000
-00000000ffffffff22222222222996622222222222222222000000000dd000000557750088888888008888000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000557750080800808000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000557500008088080000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000575500008800880000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000005555000008088080000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000005555000008800880000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000550000088888888000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000088888888000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000088888888000000000000000000000000000000000000000000000000
-33333333800000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300b30000000000333b00000
-03b3b3308000000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000003bb3300000003b33333bb300
-03b3b330d0000000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b3300000b3003333300bb0
-03b3b330d0000000d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003300300b0000330b300b0
-03b3b330d0000000d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030b300b0b3000b33003b030
-03b3b330d0000000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b333bb000000333000b000
-03b3b330d0000000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000033b00000b3b3330003000
-03b3b330d0000000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000033000003b000330000000
-00000000d0000000d0000000000000000000000000000000000000000000000000000000000550000003300000044000333333330003300b0000000333000000
-00000000d0000000d00000000000000000000000000000000000000000000000000000000055577000333cc000444ff0bbb3bbbb000330b30000000333000000
-00000000d0000000d0000000000000000000000000000000000000000000000000000000056565570393933c0454544fbbb3bbbb300333300000000033000000
-00000000d0000000d000000000000000000000000000000000000000000000000000000055556655333399334444554433333333bb3330000000000330000000
-00000000d0000000d000000000000000000000000000000000000000000000000000000055565575333933c344454454b3bbbbbb00b330000000000f40000000
-00000000d0000000d0000000000000000000000000000000000000000000000000000000655555559333333354444444b3bbbbbb000440000004f44444440000
-00000000d0000000d000000000000000000000000000000000000000000000000000000006655650099339300554454033333333000440000044400440f44000
-00000000d0000000d0000000000000000000000000000000000000000000000000000000000650000009300000054000bbbbb3bb000440000444000440044400
-00000777000000650000009800855000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00005577000005550000088808886500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00005557070056500700898000865500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00054550007655000079880000565500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00545000007750000077800000565500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-05550000044770000447700000565500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-55500000444007004440070000565500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-55000000440000004400000000055000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-__gff__
-0001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-__map__
-0000000000000000000000000000000101010101000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000101010101000101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000101010101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d00000000000000000000000100010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d00000000000000000000000100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d00000000000000000000000101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d0000000000002d000000000101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d000000002d002d000000000101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d000000002d002d000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d000000002d002d00002d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000002d000000002d002d00002d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-2000203d002000003d003d00003d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-__sfx__
-003000200465005650076500b6500f65013650126500f6500a6500565003650086500b650096500665005650076500b6500c6500e6500f6500d6500a6500765007650096500b6500d6500d6500c6500865005650
-00180020056000760008600096000b6000d6000f6001160012600136001460014600126000f6000c600076000460002600026000460006600096000a6000a6000a6000a6000a6000a6000a6000a6000860005600
