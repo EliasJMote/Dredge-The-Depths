@@ -116,7 +116,7 @@ function create_game()
 	-- camera position
 	cam = {x=0,y=0}
 
-	laser_drill_emitter = {}
+	laser_drill_emitter = nil
 	
 	-- play ocean sound
 	sfx(0)
@@ -125,7 +125,7 @@ end
 function _init()
 
 	-- version
-	version = "0.2.1"
+	version = "0.2.2"
 
 	state = "title"
 
@@ -206,15 +206,86 @@ function _update()
 
 		-- if the player reaches the exit of the level
 		--if(player.y > 40 * 8) then
-		if(player.x > 128*8) then
-			current_level = "coral_reef.p8"
-			close_buoys = {}
-			far_buoys = {}
-			bubbles = {}
-			emitters = {}
-			reload(0x0,0x0,0x4300,current_level)
-			player.x = 16
-			player.oxygen = 90
+
+		if(current_level == "shallow_waters.p8") then
+			if(player.x > 128*8) then
+				current_level = "coral_reef.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.x = 16
+				player.oxygen = 90
+			end
+		elseif(current_level == "coral_reef.p8") then
+			if(player.y > 40*8) then
+				current_level = "deep_ocean.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				waves = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.y = 16
+				player.oxygen = 90
+			end
+		elseif(current_level == "deep_ocean.p8") then
+			if(player.y > 40*8) then
+				current_level = "mountains.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.y = 16
+				player.oxygen = 90
+			end
+		elseif(current_level == "mountains.p8") then
+			if(player.x > 128*8) then
+				current_level = "crystal_caves.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.x = 16
+				player.y = 16
+				player.oxygen = 90
+			end
+		elseif(current_level == "crystal_caves.p8") then
+			if(player.y > 40*8) then
+				current_level = "ruins.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.y = 16
+				player.oxygen = 90
+			end
+		elseif(current_level == "ruins.p8") then
+			if(player.y > 40*8) then
+				current_level = "trench.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.y = 16
+				player.oxygen = 90
+			end
+		elseif(current_level == "trench.p8") then
+			if(player.y > 40*8) then
+				current_level = "core.p8"
+				close_buoys = {}
+				far_buoys = {}
+				bubbles = {}
+				emitters = {}
+				reload(0x0,0x0,0x4300,current_level)
+				player.y = 16
+				player.oxygen = 90
+			end
 		end
 
 		-- move waves
@@ -308,40 +379,50 @@ function _draw()
 		rectfill(102,119,128,127,0)
 		print("v" .. version,104,121,7)
 
+	elseif(state == "instructions") then
+		print("instructions",42,8,7)
+		print("press z/\142 to start",27,96,7)
+
 	elseif(state == "game") then
 
 		camera(cam.x,cam.y)
 
-		-- sky background
-		rectfill(cam.x,8,cam.x+127,sea_level-1+8,5)
-
-		-- draw moons
-		spr(13,cam.x+88,cam.y/8+30)
-		spr(14,cam.x+16,cam.y/4+44,2,2)
 		
-		-- ocean background
-		rectfill(cam.x,sea_level+8,cam.x+127,sea_level+64-1+8,12)
-		rectfill(cam.x,sea_level+64+8,cam.x+127,dark_level-1,1)
-		--rectfill(cam.x,sea_level+96,cam.x+127,32*10-1,0)
+		if(current_level == "shallow_waters.p8" or current_level == "coral_reef.p8") then
 
-		-- light to dark ocean gradient
-		rectfill(0,sea_level+64-6,cam.x+127,sea_level+64-6,1)
-		rectfill(0,sea_level+64,cam.x+127,sea_level+64,1)
-		rectfill(0,sea_level+64+4,cam.x+127,sea_level+64+4,1)
-		rectfill(0,sea_level+64+6,cam.x+127,sea_level+64+6,1)
+			-- sky background
+			rectfill(cam.x,8,cam.x+127,sea_level-1+8,5)
+
+
+			-- draw moons
+			spr(13,cam.x+88,cam.y/8+30)
+			spr(14,cam.x+16,cam.y/4+44,2,2)
+
+			-- ocean background
+			rectfill(cam.x,sea_level+8,cam.x+127,sea_level+64-1+8,12)
+			rectfill(cam.x,sea_level+64+8,cam.x+127,dark_level-1,1)
+
+			-- light to dark ocean gradient
+			rectfill(0,sea_level+64-6,cam.x+127,sea_level+64-6,1)
+			rectfill(0,sea_level+64,cam.x+127,sea_level+64,1)
+			rectfill(0,sea_level+64+4,cam.x+127,sea_level+64+4,1)
+			rectfill(0,sea_level+64+6,cam.x+127,sea_level+64+6,1)
+
+			--skyline
+			rectfill(0,8,cam.x+127,10,6)
+			rectfill(0,12,cam.x+127,12,6)
+			rectfill(0,14,cam.x+127,14,6)
+			rectfill(0,18,cam.x+127,18,6)
+			rectfill(0,24,cam.x+127,24,6)
+		else
+			rectfill(cam.x,8,cam.x+127,dark_level-1,1)
+		end
 
 		-- dark to black ocean gradient
 		rectfill(0,dark_level-2,cam.x+127,dark_level-2,0)
 		rectfill(0,dark_level-4,cam.x+127,dark_level-4,0)
 		rectfill(0,dark_level-8,cam.x+127,dark_level-8,0)
 		rectfill(0,dark_level-14,cam.x+127,dark_level-14,0)
-
-		--skyline
-		rectfill(0,8,cam.x+127,10,6)
-		rectfill(0,12,cam.x+127,12,6)
-		rectfill(0,14,cam.x+127,14,6)
-		rectfill(0,18,cam.x+127,18,6)
-		rectfill(0,24,cam.x+127,24,6)
 
 		-- draw far buoys
 		for b in all(far_buoys) do
